@@ -19,13 +19,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         id: setup-node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version-file: .nvmrc
+          node-version-file: .node-version
           cache: npm
 
       - name: Install Dependencies
@@ -48,17 +48,63 @@ jobs:
     name: GitHub Actions Test
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: read
+
+    env:
+      DOCKER_IMAGE: ghcr.io/cerberauth/api-vulns-challenges/jwt-strong-eddsa-key:latest
+
     steps:
       - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Test Local Action
-        id: test-action
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Server
+        run: |
+          docker run -d -p 8080:8080 ${{ env.DOCKER_IMAGE }}
+          sleep 5
+
+      - name: Get JWT
+        id: get-jwt
+        run: |
+          echo "jwt=$(docker run --rm ${{ env.DOCKER_IMAGE }} jwt)" >> $GITHUB_OUTPUT
+
+      - name: Test cURL Local Action
         uses: ./
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          curl:
-            'curl https://api.github.com/repos/${{ github.repository
-            }}/actions/runs/${{ github.run_id }}/jobs'
+          scans: jwt.*
+          curl: |
+            curl http://localhost:8080 -H "Authorization: Bearer ${{ steps.get-jwt.outputs.jwt }}"
+
+      - name: Test cURL Local Action without Telemetry
+        uses: ./
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          scans: jwt.*
+          curl: |
+            curl http://localhost:8080 -H "Authorization: Bearer ${{ steps.get-jwt.outputs.jwt }}"
+          telemetry: false
+
+      # - name: Test OpenAPI Local Action
+      #   uses: ./
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     scans: jwt.*
+      #     openapi: ./__tests__/openapi.yaml
+      #     telemetry: false
+
+      - name: Stop Server
+        if: ${{ always() }}
+        run:
+          docker stop $(docker ps -q --filter ancestor=${{ env.DOCKER_IMAGE }})

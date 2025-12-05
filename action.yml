@@ -1,11 +1,11 @@
 name: 'VulnAPI Action'
 description:
-  "GitHub Action to use CerberAuth's VulnAPI to check for vulnerabilities in
-  your API"
+  'VulnAPI is an open-source project designed to help you scan your APIs for
+  common security vulnerabilities and weaknesses.'
 author: 'CerberAuth'
 branding:
   icon: 'shield'
-  color: 'purple'
+  color: 'gray-dark'
 
 inputs:
   version:
@@ -21,6 +21,34 @@ inputs:
     description: 'The OpenAPI file used to run API vulnerability scans'
     required: false
 
+  scans:
+    description: 'The scans performed'
+    required: false
+
+  excludeScans:
+    description: 'The scans to exclude'
+    required: false
+
+  rateLimit:
+    description: 'The rate limit used to run API vulnerability scans'
+    required: false
+    default: 10/s
+
+  telemetry:
+    description:
+      'VulnAPI uses fully anonymized telemetry data to help improve the tool.
+      You can disable it by setting this to false.'
+    required: false
+    default: 'true'
+
+  proxy:
+    description: 'The proxy server used during the scan'
+    required: false
+
+  severityThreshold:
+    description: 'The severity threshold to trigger a failure'
+    required: false
+
 runs:
-  using: node20
+  using: node24
   main: dist/index.js
